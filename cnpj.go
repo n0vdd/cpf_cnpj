@@ -2,79 +2,99 @@ package cpfcnpj
 
 import (
 	"fmt"
-	"regexp"
+	"strconv"
+	"strings"
 )
 
+// Constants for CNPJ validation
+const (
+	CNPJLength = 14
+)
+
+// CNPJ validation tables for Module 11 algorithm
 var (
+	// Keep lowercase for internal use
 	cnpjFirstDigitTable  = []int{5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
 	cnpjSecondDigitTable = []int{6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2}
 )
 
-const (
-	// CNPJFormatPattern is the pattern for string replacement
-	// with Regex
-	CNPJFormatPattern string = `([\d]{2})([\d]{3})([\d]{3})([\d]{4})([\d]{2})`
-)
-
-// CNPJ type definition
+// CNPJ represents a Brazilian tax identification number.
+// Supports both numeric and alphanumeric formats.
 type CNPJ string
 
-// NewCNPJ is a helper function to convert and clean a new CNPJ
-// from a string
-func NewCNPJ(s string) CNPJ {
-	return CNPJ(Clean(s))
+// NewCnpj creates and validates a CNPJ from a string.
+// Supports both numeric and alphanumeric formats.
+// Returns error if CNPJ is invalid.
+func NewCnpj(s string) (CNPJ, error) {
+	// Clean input: keep alphanumeric chars, normalize case
+	cleaned := Clean(s)
+
+	// Validate length
+	if len(cleaned) != CNPJLength {
+		return "", fmt.Errorf("CNPJ must have exactly %d characters, got %d: %w", CNPJLength, len(cleaned),
+			ErrCNPJInvalidLength)
+	}
+
+	// Validate character format
+	if !isValidCNPJFormat(cleaned) {
+		return "", fmt.Errorf("CNPJ format is invalid: first 12 characters must be A-Z or 0-9, "+
+			"last 2 must be 0-9: %w", ErrCNPJInvalidAlphanumeric)
+	}
+
+	// Reject invalid patterns (all same characters)
+	if isSameCharacter(cleaned) {
+		return "", fmt.Errorf("CNPJ cannot have all same characters: %w", ErrAllSameDigits)
+	}
+
+	// Validate check digits using Module 11 algorithm
+	firstPart := cleaned[:12]
+	d1, d2, err := calculateModule11Digits(firstPart, cnpjFirstDigitTable, cnpjSecondDigitTable)
+	if err != nil {
+		return "", fmt.Errorf("error calculating CNPJ check digits: %w", err)
+	}
+
+	expectedCNPJ := firstPart + strconv.Itoa(d1) + strconv.Itoa(d2)
+	if expectedCNPJ != cleaned {
+		return "", fmt.Errorf("CNPJ check digits are invalid: %w", ErrCNPJInvalidChecksum)
+	}
+
+	return CNPJ(cleaned), nil
 }
 
-// IsValid returns if CNPJ is a valid CNPJ document
-func (c *CNPJ) IsValid() bool {
-	return ValidateCNPJ(string(*c))
-}
-
-// String returns a formatted CNPJ document
-// 00.000.000/0001-00
+// String returns the CNPJ formatted as XX.XXX.XXX/XXXX-XX.
 func (c *CNPJ) String() string {
-
 	str := string(*c)
 
-	if !c.IsValid() {
+	// Safety check: only format if exactly 14 characters
+	if len(str) != CNPJLength {
 		return str
 	}
 
-	expr, err := regexp.Compile(CNPJFormatPattern)
-
-	if err != nil {
-		return str
-	}
-
-	return expr.ReplaceAllString(str, "$1.$2.$3/$4-$5")
+	// Use shared formatting function
+	return formatDocument(str, "XX.XXX.XXX/XXXX-XX")
 }
 
-// ValidateCNPJ validates a CNPJ document
-// You should use without punctuation
-func ValidateCNPJ(cnpj string) bool {
-
-	if len(cnpj) != 14 {
+// isValidCNPJFormat validates the character format of CNPJ
+func isValidCNPJFormat(cnpj string) bool {
+	if len(cnpj) != CNPJLength {
 		return false
 	}
 
-	firstPart := cnpj[:12]
-	sum1 := sumDigit(firstPart, cnpjFirstDigitTable)
-	rest1 := sum1 % 11
-	d1 := 0
-
-	if rest1 >= 2 {
-		d1 = 11 - rest1
+	// First 12 characters must be alphanumeric (A-Z, 0-9)
+	firstTwelve := cnpj[:12]
+	if invalidIndex := strings.IndexFunc(firstTwelve, func(r rune) bool {
+		return !((r >= '0' && r <= '9') || (r >= 'A' && r <= 'Z'))
+	}); invalidIndex != -1 {
+		return false
 	}
 
-	secondPart := fmt.Sprintf("%s%d", firstPart, d1)
-	sum2 := sumDigit(secondPart, cnpjSecondDigitTable)
-	rest2 := sum2 % 11
-	d2 := 0
-
-	if rest2 >= 2 {
-		d2 = 11 - rest2
+	// Last 2 characters must be numeric (check digits)
+	lastTwo := cnpj[12:]
+	if invalidIndex := strings.IndexFunc(lastTwo, func(r rune) bool {
+		return !(r >= '0' && r <= '9')
+	}); invalidIndex != -1 {
+		return false
 	}
 
-	finalPart := fmt.Sprintf("%s%d", secondPart, d2)
-	return finalPart == cnpj
+	return true
 }

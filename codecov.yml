@@ -1,0 +1,47 @@
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 5%
+        if_ci_failed: error
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+        if_ci_failed: error
+    changes:
+      default:
+        if_ci_failed: error
+
+comment:
+  layout: "reach,diff,flags,files,footer"
+  behavior: default
+  require_changes: false
+  require_base: no
+  require_head: yes
+  branches:
+    - master
+    - main
+
+github_checks:
+  annotations: true
+
+ignore:
+  - "**/*_test.go"
+  - "**/testdata/**"
+  - "**/*.pb.go"
+  - "**/vendor/**"
+
+flag_management:
+  default_rules:
+    carryforward: true
+    statuses:
+      - type: project
+        target: 80%
+      - type: patch
+        target: 80%

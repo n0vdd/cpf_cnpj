@@ -1,84 +1,76 @@
-// Package cpfcnpj provides functions for validate CPF and CNPJ, the Brazilian taxpayer registry identification document
+// Package cpfcnpj provides validation and formatting for Brazilian taxpayer identification documents (CPF and CNPJ).
+//
+// Basic usage:
+//
+//	cpf, err := cpfcnpj.NewCpf("716.566.867-59")
+//	if err != nil {
+//	    log.Fatal(err)
+//	}
+//	fmt.Println(cpf.String()) // "716.566.867-59"
+//
+// The package supports both numeric and alphanumeric CNPJ formats.
 package cpfcnpj
 
 import (
 	"fmt"
-	"regexp"
 	"strconv"
 )
 
+// Constants for CPF validation
+const (
+	CPFLength = 11
+)
+
+// CPF validation tables for Module 11 algorithm
 var (
 	cpfFirstDigitTable  = []int{10, 9, 8, 7, 6, 5, 4, 3, 2}
 	cpfSecondDigitTable = []int{11, 10, 9, 8, 7, 6, 5, 4, 3, 2}
 )
 
-const (
-	// CPFFormatPattern is the pattern for string replacement
-	// with Regex
-	CPFFormatPattern string = `([\d]{3})([\d]{3})([\d]{3})([\d]{2})`
-)
-
 // CPF type definition
 type CPF string
 
-// NewCPF is a helper function to convert and clean a new CPF
-// from a string
-func NewCPF(s string) CPF {
-	return CPF(Clean(s))
+// NewCpf creates and validates a CPF from a string.
+// Returns error if CPF is invalid.
+func NewCpf(s string) (CPF, error) {
+	// Clean input: keep only digits
+	cleaned := Clean(s)
+
+	// Validate length
+	if len(cleaned) != CPFLength {
+		return "", fmt.Errorf("CPF must have exactly %d digits, got %d: %w", CPFLength, len(cleaned),
+			ErrCPFInvalidLength)
+	}
+
+	// Reject invalid patterns (all same digits)
+	if isSameCharacter(cleaned) {
+		return "", fmt.Errorf("CPF cannot have all digits the same: %w", ErrAllSameDigits)
+	}
+
+	// Validate check digits using Module 11 algorithm
+	firstPart := cleaned[:9]
+	d1, d2, err := calculateModule11Digits(firstPart, cpfFirstDigitTable, cpfSecondDigitTable)
+	if err != nil {
+		return "", fmt.Errorf("error calculating CPF check digits: %w", err)
+	}
+
+	expectedCPF := firstPart + strconv.Itoa(d1) + strconv.Itoa(d2)
+	if expectedCPF != cleaned {
+		return "", fmt.Errorf("CPF check digits are invalid: %w", ErrCPFInvalidChecksum)
+	}
+
+	return CPF(cleaned), nil
 }
 
-// IsValid returns if CPF is a valid CPF document
-func (c *CPF) IsValid() bool {
-	return ValidateCPF(string(*c))
-}
-
-// String returns a formatted CPF document
-// 000.000.000-00
+// String returns the CPF formatted as XXX.XXX.XXX-XX.
 func (c *CPF) String() string {
-
 	str := string(*c)
 
-	if !c.IsValid() {
+	// Safety check: only format if exactly 11 digits
+	if len(str) != CPFLength {
 		return str
 	}
 
-	expr, err := regexp.Compile(CPFFormatPattern)
-
-	if err != nil {
-		return str
-	}
-
-	return expr.ReplaceAllString(str, "$1.$2.$3-$4")
-}
-
-// ValidateCPF validates a CPF document
-// You should use without punctuation
-func ValidateCPF(cpf string) bool {
-	if len(cpf) != 11 {
-		return false
-	}
-
-	firstPart := cpf[0:9]
-	sum := sumDigit(firstPart, cpfFirstDigitTable)
-
-	r1 := sum % 11
-	d1 := 0
-
-	if r1 >= 2 {
-		d1 = 11 - r1
-	}
-
-	secondPart := firstPart + strconv.Itoa(d1)
-
-	dsum := sumDigit(secondPart, cpfSecondDigitTable)
-
-	r2 := dsum % 11
-	d2 := 0
-
-	if r2 >= 2 {
-		d2 = 11 - r2
-	}
-
-	finalPart := fmt.Sprintf("%s%d%d", firstPart, d1, d2)
-	return finalPart == cpf
+	// Use shared formatting function
+	return formatDocument(str, "XXX.XXX.XXX-XX")
 }

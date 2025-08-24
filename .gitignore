@@ -4,6 +4,13 @@
 *.so
 *.dylib
 
+.idea
+
+.claude
+
+# Development documentation (not for public release)
+CLAUDE.md
+
 # Test binary, build with `go test -c`
 *.test
 

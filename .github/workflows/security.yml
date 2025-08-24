@@ -1,0 +1,167 @@
+name: Security & Quality
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  schedule:
+    - cron: '0 0 * * 0' # Weekly security scan
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23.x'
+        cache: true
+
+    - name: Cache Go modules
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/go/pkg/mod
+          ~/.cache/go-build
+        key: ${{ runner.os }}-go-1.23.x-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-1.23.x-
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run golangci-lint
+      uses: golangci/golangci-lint-action@v6
+      with:
+        version: v1.61
+        args: --timeout=10m --verbose
+        only-new-issues: ${{ github.event_name == 'pull_request' }}
+
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23.x'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run gosec Security Scanner
+      uses: securecodewarrior/github-action-gosec@master
+      with:
+        args: '-no-fail -fmt sarif -out gosec.sarif ./...'
+
+    - name: Upload SARIF file
+      if: always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: gosec.sarif
+
+    - name: Run Nancy vulnerability scanner
+      run: |
+        go install github.com/sonatypecommunity/nancy@latest
+        go list -json -deps ./... | nancy sleuth
+
+  coverage:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23.x'
+        cache: true
+
+    - name: Download dependencies
+      run: go mod download
+
+    - name: Run tests with coverage
+      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+
+    - name: Generate coverage report
+      run: go tool cover -html=coverage.out -o coverage.html
+
+    - name: Check coverage threshold
+      run: |
+        COVERAGE=$(go tool cover -func=coverage.out | grep total | awk '{print $3}' | sed 's/%//')
+        echo "Total coverage: ${COVERAGE}%"
+        if (( $(echo "${COVERAGE} < 70" | bc -l) )); then
+          echo "Coverage ${COVERAGE}% is below minimum threshold of 70%"
+          exit 1
+        fi
+
+    - name: Upload coverage reports
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-report
+        path: |
+          coverage.out
+          coverage.html
+        retention-days: 30
+
+    - name: Upload to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        file: ./coverage.out
+        flags: unittests
+        name: coverage-report
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
+
+  dependency-check:
+    name: Dependency Security Check
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.23.x'
+
+    - name: Run govulncheck
+      run: |
+        go install golang.org/x/vuln/cmd/govulncheck@latest
+        govulncheck ./...
+
+    - name: Check for known vulnerabilities
+      run: |
+        go install github.com/Templum/govulncheck-action@latest
+        go mod tidy
+        go list -json -deps ./... > dependencies.json
+
+    - name: Upload dependency list
+      uses: actions/upload-artifact@v4
+      with:
+        name: dependencies
+        path: dependencies.json
+        retention-days: 7
