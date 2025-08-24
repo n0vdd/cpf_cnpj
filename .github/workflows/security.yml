@@ -29,7 +29,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23.x'
+        go-version: '1.24.x'
         cache: true
 
     - name: Cache Go modules
@@ -38,9 +38,9 @@ jobs:
         path: |
           ~/go/pkg/mod
           ~/.cache/go-build
-        key: ${{ runner.os }}-go-1.23.x-${{ hashFiles('**/go.sum') }}
+        key: ${{ runner.os }}-go-1.24.x-${{ hashFiles('**/go.sum') }}
         restore-keys: |
-          ${{ runner.os }}-go-1.23.x-
+          ${{ runner.os }}-go-1.24.x-
 
     - name: Download dependencies
       run: go mod download
@@ -48,7 +48,7 @@ jobs:
     - name: Run golangci-lint
       uses: golangci/golangci-lint-action@v6
       with:
-        version: v1.61
+        version: v1.64.8
         args: --timeout=10m --verbose
         only-new-issues: ${{ github.event_name == 'pull_request' }}
 
@@ -63,27 +63,18 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23.x'
+        go-version: '1.24.x'
         cache: true
 
     - name: Download dependencies
       run: go mod download
 
+    - name: Install gosec
+      run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+
     - name: Run gosec Security Scanner
-      uses: securecodewarrior/github-action-gosec@master
-      with:
-        args: '-no-fail -fmt sarif -out gosec.sarif ./...'
+      run: gosec ./...
 
-    - name: Upload SARIF file
-      if: always()
-      uses: github/codeql-action/upload-sarif@v3
-      with:
-        sarif_file: gosec.sarif
-
-    - name: Run Nancy vulnerability scanner
-      run: |
-        go install github.com/sonatypecommunity/nancy@latest
-        go list -json -deps ./... | nancy sleuth
 
   coverage:
     name: Coverage Report
@@ -96,7 +87,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23.x'
+        go-version: '1.24.x'
         cache: true
 
     - name: Download dependencies
@@ -129,7 +120,7 @@ jobs:
     - name: Upload to Codecov
       uses: codecov/codecov-action@v5
       with:
-        file: ./coverage.out
+        files: ./coverage.out
         flags: unittests
         name: coverage-report
         fail_ci_if_error: false
@@ -146,7 +137,7 @@ jobs:
     - name: Set up Go
       uses: actions/setup-go@v5
       with:
-        go-version: '1.23.x'
+        go-version: '1.24.x'
 
     - name: Run govulncheck
       run: |

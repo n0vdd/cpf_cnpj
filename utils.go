@@ -169,7 +169,7 @@ func filterToDigitsOnly(s string) string {
 	}, s)
 }
 
-func formatDocument(s string, pattern string) string {
+func formatDocument(s, pattern string) string {
 	var result strings.Builder
 	result.Grow(len(pattern))
 
