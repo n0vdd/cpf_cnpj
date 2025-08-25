@@ -37,13 +37,13 @@ jobs:
         go-version: ${{ matrix.go-version }}
 
     - name: Run tests
-      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      run: go test -v -race -coverprofile coverage.out -covermode atomic ./...
 
     - name: Upload coverage to Codecov
       if: matrix.go-version == '1.24.x' && matrix.os == 'ubuntu-latest'
       uses: codecov/codecov-action@v5
       with:
-        files: ./coverage.out
+        files: coverage.out
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
@@ -112,7 +112,7 @@ jobs:
       run: go build -v ./...
 
     - name: Run tests with coverage
-      run: go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
+      run: go test -v -race -coverprofile coverage.out -covermode atomic ./...
 
     - name: Generate coverage report
       run: go tool cover -html=coverage.out -o coverage.html
