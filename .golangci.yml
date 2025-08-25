@@ -55,7 +55,7 @@ linters-settings:
       - condition
       - operation
       - return
-    ignored-numbers: 0,1,2,3,4,5,6,7,8,9,10,11,14,48,100
+    ignored-numbers: [0,1,2,3,4,5,6,7,8,9,10,11,14,48,100]
   
   govet:
     enable-all: true
@@ -133,7 +133,6 @@ issues:
     - vendor
   exclude-files:
     - ".*_test.go"
-  unique-by-line: true
   exclude-rules:
     - path: _test\.go
       linters:

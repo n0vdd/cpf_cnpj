@@ -179,7 +179,7 @@ func Clean(s string) string {
 	result := cleanString(s)
 
 	// Apply document-type specific filtering based on detected length
-	if len(result) == 11 {
+	if len(result) < 14 {
 		// CPF: should contain only digits, filter out any letters
 		return filterToDigitsOnly(result)
 	}
