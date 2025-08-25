@@ -350,3 +350,180 @@ func TestIsValidCNPJFormat_BoundaryConditions(t *testing.T) {
 		})
 	}
 }
+
+// Test CNPJ Raw method with numeric CNPJs
+func TestCNPJRaw_Numeric(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"Valid numeric CNPJ formatted", "22.796.729/0001-59", "22796729000159"},
+		{"Valid numeric CNPJ unformatted", "22796729000159", "22796729000159"},
+		{"Valid numeric CNPJ with spaces", " 22.796.729/0001-59 ", "22796729000159"},
+		{"Another valid numeric CNPJ", "11222333000181", "11222333000181"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cnpj, err := NewCnpj(tt.input)
+			if err != nil {
+				t.Errorf("NewCnpj(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+
+			got := cnpj.Raw()
+			if got != tt.expected {
+				t.Errorf("CNPJ.Raw() = %q, want %q", got, tt.expected)
+			}
+
+			// Verify Raw returns exactly 14 characters
+			if len(got) != CNPJLength {
+				t.Errorf("CNPJ.Raw() returned wrong length: got %d, want %d", len(got), CNPJLength)
+			}
+
+			// Verify all characters are digits for numeric CNPJ
+			for i, char := range got {
+				if char < '0' || char > '9' {
+					t.Errorf("CNPJ.Raw()[%d] = %q, expected digit", i, char)
+				}
+			}
+		})
+	}
+}
+
+// Test CNPJ Raw method with alphanumeric CNPJs
+func TestCNPJRaw_Alphanumeric(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"Valid alphanumeric CNPJ formatted", "12.ABC.345/01DE-35", "12ABC34501DE35"},
+		{"Valid alphanumeric CNPJ unformatted", "12ABC34501DE35", "12ABC34501DE35"},
+		{"Valid alphanumeric with spaces", " 12.ABC.345/01DE-35 ", "12ABC34501DE35"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cnpj, err := NewCnpj(tt.input)
+			if err != nil {
+				t.Errorf("NewCnpj(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+
+			got := cnpj.Raw()
+			if got != tt.expected {
+				t.Errorf("CNPJ.Raw() = %q, want %q", got, tt.expected)
+			}
+
+			// Verify Raw returns exactly 14 characters
+			if len(got) != CNPJLength {
+				t.Errorf("CNPJ.Raw() returned wrong length: got %d, want %d", len(got), CNPJLength)
+			}
+
+			// Verify first 12 characters are alphanumeric, last 2 are digits
+			for i, char := range got[:12] {
+				if !((char >= '0' && char <= '9') || (char >= 'A' && char <= 'Z')) {
+					t.Errorf("CNPJ.Raw()[%d] = %q, expected alphanumeric character", i, char)
+				}
+			}
+
+			// Verify last 2 characters are digits (check digits)
+			for i, char := range got[12:] {
+				if char < '0' || char > '9' {
+					t.Errorf("CNPJ.Raw()[%d+12] = %q, expected digit", i, char)
+				}
+			}
+		})
+	}
+}
+
+// Test CNPJ Raw vs String consistency
+func TestCNPJRawStringConsistency(t *testing.T) {
+	testCNPJs := []struct {
+		name     string
+		input    string
+		cleanRaw string
+	}{
+		{"Numeric CNPJ", "22.796.729/0001-59", "22796729000159"},
+		{"Alphanumeric CNPJ", "12.ABC.345/01DE-35", "12ABC34501DE35"},
+		{"Mixed case cleaned", "12.abc.345/01de-35", "12ABC34501DE35"}, // Clean() normalizes case
+	}
+
+	for _, tt := range testCNPJs {
+		t.Run(tt.name, func(t *testing.T) {
+			cnpj, err := NewCnpj(tt.input)
+			if err != nil {
+				t.Errorf("NewCnpj(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+
+			raw := cnpj.Raw()
+			formatted := cnpj.String()
+
+			// Raw should be the cleaned characters
+			if raw != tt.cleanRaw {
+				t.Errorf("CNPJ.Raw() = %q, expected %q", raw, tt.cleanRaw)
+			}
+
+			// String should be formatted version
+			expectedFormatted := formatDocument(tt.cleanRaw, "XX.XXX.XXX/XXXX-XX")
+			if formatted != expectedFormatted {
+				t.Errorf("CNPJ.String() = %q, expected %q", formatted, expectedFormatted)
+			}
+
+			// Cleaning formatted should give raw
+			cleaned := Clean(formatted)
+			if cleaned != raw {
+				t.Errorf("Clean(CNPJ.String()) = %q, expected CNPJ.Raw() = %q", cleaned, raw)
+			}
+		})
+	}
+}
+
+// Test CNPJ Raw method edge cases
+func TestCNPJRaw_EdgeCases(t *testing.T) {
+	// Note: We can't test with actually invalid CNPJs since NewCnpj validates them
+	// These tests focus on valid CNPJs that exercise different character ranges
+
+	validTestCNPJs := []string{
+		"11444777000161", // Valid numeric CNPJ
+	}
+
+	for _, testCNPJ := range validTestCNPJs {
+		t.Run("Valid_"+testCNPJ, func(t *testing.T) {
+			cnpj, err := NewCnpj(testCNPJ)
+			if err != nil {
+				t.Errorf("NewCnpj(%q) unexpected error: %v", testCNPJ, err)
+				return
+			}
+
+			raw := cnpj.Raw()
+
+			// Raw should equal the clean input for valid CNPJs
+			cleaned := Clean(testCNPJ)
+			if raw != cleaned {
+				t.Errorf("CNPJ.Raw() = %q, expected Clean(%q) = %q", raw, testCNPJ, cleaned)
+			}
+
+			// Raw should be exactly 14 characters
+			if len(raw) != CNPJLength {
+				t.Errorf("CNPJ.Raw() length = %d, expected %d", len(raw), CNPJLength)
+			}
+		})
+	}
+}
+
+// Benchmark CNPJ Raw method for performance verification
+func BenchmarkCNPJRaw(b *testing.B) {
+	cnpj, err := NewCnpj("22796729000159")
+	if err != nil {
+		b.Fatal("Failed to create CNPJ for benchmark:", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = cnpj.Raw()
+	}
+}

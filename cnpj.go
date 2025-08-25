@@ -74,6 +74,15 @@ func (c *CNPJ) String() string {
 	return formatDocument(str, "XX.XXX.XXX/XXXX-XX")
 }
 
+// Raw returns the CNPJ as unformatted string (digits and letters only).
+// This is a zero-allocation method that returns the underlying
+// clean CNPJ characters without any formatting symbols.
+// Supports both numeric (e.g., "22796729000159") and
+// alphanumeric (e.g., "12ABC34501DE35") formats.
+func (c *CNPJ) Raw() string {
+	return string(*c)
+}
+
 // isValidCNPJFormat validates the character format of CNPJ
 func isValidCNPJFormat(cnpj string) bool {
 	if len(cnpj) != CNPJLength {

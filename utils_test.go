@@ -1,6 +1,7 @@
 package cpfcnpj
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -83,6 +84,12 @@ func TestIsAlreadyClean(t *testing.T) {
 		// Mixed valid and invalid patterns
 		{"Length 11 mixed valid", "12345ABCDE6", false},  // CPF length with letters
 		{"Length 14 all digits", "12345678901234", true}, // CNPJ length, all digits is valid
+
+		// DoS protection tests - inputs over MaxInputSize (1000) should return false
+		{"DoS protection - exactly at limit", strings.Repeat("1", 1000), false},                        // Too long even if valid chars
+		{"DoS protection - just over limit", strings.Repeat("1", 1001), false},                         // Over limit
+		{"DoS protection - way over limit", strings.Repeat("A", 2000), false},                          // Way over limit
+		{"DoS protection - valid length but padded", "71656686759" + strings.Repeat("X", 1000), false}, // Valid + padding = over limit
 	}
 
 	for _, tt := range tests {
@@ -163,6 +170,13 @@ func TestCleanString(t *testing.T) {
 		{"All lowercase", "abcdefghijklmnopqrstuvwxyz", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"},
 		{"All uppercase", "ABCDEFGHIJKLMNOPQRSTUVWXYZ", "ABCDEFGHIJKLMNOPQRSTUVWXYZ"},
 		{"Mixed case comprehensive", "aAbBcCdDeEfFgGhH", "AABBCCDDEEFFGGHH"},
+
+		// DoS protection tests - inputs over MaxInputSize (1000) should return empty string
+		{"DoS protection - exactly at limit", strings.Repeat("1", 1000), strings.Repeat("1", 1000)},
+		{"DoS protection - just over limit", strings.Repeat("1", 1001), ""},
+		{"DoS protection - way over limit", strings.Repeat("A", 2000), ""},
+		{"DoS protection - very large input", strings.Repeat("1A", 5000), ""},
+		{"DoS protection - mixed chars over limit", strings.Repeat("1A2B", 300), ""},
 	}
 
 	for _, tt := range tests {

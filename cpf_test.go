@@ -204,3 +204,91 @@ func TestNewCPF_InvalidCharacterValidation_EdgeCase(t *testing.T) {
 		})
 	}
 }
+
+// Test CPF Raw method
+func TestCPFRaw(t *testing.T) {
+	tests := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{"Valid formatted CPF", "716.566.867-59", "71656686759"},
+		{"Valid unformatted CPF", "71656686759", "71656686759"},
+		{"Valid CPF with spaces", " 716.566.867-59 ", "71656686759"},
+		{"Another valid CPF", "648.446.967-93", "64844696793"},
+		{"CPF with leading zeros", "031.671.580-85", "03167158085"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cpf, err := NewCpf(tt.input)
+			if err != nil {
+				t.Errorf("NewCpf(%q) unexpected error: %v", tt.input, err)
+				return
+			}
+
+			got := cpf.Raw()
+			if got != tt.expected {
+				t.Errorf("CPF.Raw() = %q, want %q", got, tt.expected)
+			}
+
+			// Verify Raw returns only digits
+			if len(got) != CPFLength {
+				t.Errorf("CPF.Raw() returned wrong length: got %d, want %d", len(got), CPFLength)
+			}
+
+			// Verify all characters are digits
+			for i, char := range got {
+				if char < '0' || char > '9' {
+					t.Errorf("CPF.Raw()[%d] = %q, expected digit", i, char)
+				}
+			}
+		})
+	}
+}
+
+// Test CPF Raw vs String consistency
+func TestCPFRawStringConsistency(t *testing.T) {
+	for _, validCPF := range validCPFs {
+		t.Run(validCPF, func(t *testing.T) {
+			cpf, err := NewCpf(validCPF)
+			if err != nil {
+				t.Errorf("NewCpf(%q) unexpected error: %v", validCPF, err)
+				return
+			}
+
+			raw := cpf.Raw()
+			formatted := cpf.String()
+
+			// Raw should be the cleaned digits
+			if raw != validCPF {
+				t.Errorf("CPF.Raw() = %q, expected %q", raw, validCPF)
+			}
+
+			// String should be formatted version
+			expectedFormatted := formatDocument(validCPF, "XXX.XXX.XXX-XX")
+			if formatted != expectedFormatted {
+				t.Errorf("CPF.String() = %q, expected %q", formatted, expectedFormatted)
+			}
+
+			// Cleaning formatted should give raw
+			cleaned := Clean(formatted)
+			if cleaned != raw {
+				t.Errorf("Clean(CPF.String()) = %q, expected CPF.Raw() = %q", cleaned, raw)
+			}
+		})
+	}
+}
+
+// Benchmark CPF Raw method for performance verification
+func BenchmarkCPFRaw(b *testing.B) {
+	cpf, err := NewCpf("71656686759")
+	if err != nil {
+		b.Fatal("Failed to create CPF for benchmark:", err)
+	}
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_ = cpf.Raw()
+	}
+}

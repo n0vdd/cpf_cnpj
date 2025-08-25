@@ -103,6 +103,18 @@ fmt.Println(cpfcnpj.Clean("22.796.729/0001-59"))  // "22796729000159"
 fmt.Println(cpfcnpj.Clean("12.abc.345/01de-35"))  // "12ABC34501DE35"
 ```
 
+### Raw vs Formatted Output
+
+```go
+cpf, _ := cpfcnpj.NewCpf("716.566.867-59")
+fmt.Println(cpf.String()) // "716.566.867-59" (formatted)
+fmt.Println(cpf.Raw())    // "71656686759" (raw digits only)
+
+cnpj, _ := cpfcnpj.NewCnpj("12.ABC.345/01DE-35")
+fmt.Println(cnpj.String()) // "12.ABC.345/01DE-35" (formatted)
+fmt.Println(cnpj.Raw())    // "12ABC34501DE35" (raw characters only)
+```
+
 ## CNPJ Alfanumérico
 
 This package supports the new Brazilian **CNPJ Alfanumérico** format introduced by [Instrução Normativa RFB nº 2.119/2022](https://www.in.gov.br/en/web/dou/-/instrucao-normativa-rfb-n-2.119-de-21-de-dezembro-de-2022-454078082).
@@ -163,6 +175,10 @@ func Clean(s string) string
 // String returns formatted document
 func (c *CPF) String() string   // Returns: "716.566.867-59"
 func (c *CNPJ) String() string  // Returns: "22.796.729/0001-59" or "12.ABC.345/01DE-35"
+
+// Raw returns unformatted document (zero-allocation)
+func (c *CPF) Raw() string      // Returns: "71656686759"
+func (c *CNPJ) Raw() string     // Returns: "22796729000159" or "12ABC34501DE35"
 ```
 
 ### Error Types

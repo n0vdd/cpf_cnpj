@@ -74,3 +74,10 @@ func (c *CPF) String() string {
 	// Use shared formatting function
 	return formatDocument(str, "XXX.XXX.XXX-XX")
 }
+
+// Raw returns the CPF as unformatted string (digits only).
+// This is a zero-allocation method that returns the underlying
+// clean CPF digits without any formatting characters.
+func (c *CPF) Raw() string {
+	return string(*c)
+}

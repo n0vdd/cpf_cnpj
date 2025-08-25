@@ -20,34 +20,62 @@ var (
 	ErrCNPJInvalidChecksum     = errors.New("CNPJ checksum validation failed")
 	ErrCNPJInvalidAlphanumeric = errors.New("CNPJ alphanumeric format invalid: " +
 		"first 12 must be A-Z or 0-9, last 2 must be digits")
+
+	// Security-related errors
+	ErrInputTooLarge = errors.New("input string too large: maximum 1000 characters allowed")
+)
+
+// Security constants for DoS protection
+const (
+	// MaxInputSize defines the maximum allowed input string length to prevent DoS attacks.
+	// This is generous enough for any valid formatted document (e.g., "12.ABC.345/01DE-35" = 18 chars)
+	// while preventing extremely large inputs from consuming excessive resources.
+	MaxInputSize = 1000
 )
 
 func isAlreadyClean(s string) bool {
-	// Quick length check
+	// DoS protection: reject oversized inputs immediately
+	if len(s) > MaxInputSize {
+		return false
+	}
+
+	// Quick length check for valid document lengths
 	if len(s) != 11 && len(s) != 14 {
 		return false
 	}
 
 	isDigitsOnly := len(s) == 11
 
-	// Single pass to check if already clean
+	// Single pass to check if already clean - optimized character validation
 	for i := 0; i < len(s); i++ {
 		ch := s[i]
+
+		// Optimize: combine digit check with early return for performance
 		if ch >= '0' && ch <= '9' {
 			continue // Valid for both CPF and CNPJ
-		} else if ch >= 'A' && ch <= 'Z' {
-			if isDigitsOnly {
-				return false // CPF should be digits only
-			}
-			continue // Valid for CNPJ
 		}
-		return false // Invalid character or lowercase
+
+		// Optimize: combine letter check with CPF validation in single condition
+		if ch >= 'A' && ch <= 'Z' && !isDigitsOnly {
+			continue // Valid for CNPJ alphanumeric
+		}
+
+		// Any other character (including lowercase letters or invalid chars for CPF) is invalid
+		return false
 	}
 
 	return true
 }
 
 func cleanString(s string) string {
+	// DoS protection: validate input size before processing
+	// This prevents potential memory exhaustion attacks from extremely large inputs
+	if len(s) > MaxInputSize {
+		// Return empty string for oversized inputs instead of panicking
+		// This maintains backward compatibility while providing protection
+		return ""
+	}
+
 	// Use strings.Map for efficient character transformation
 	return strings.Map(func(r rune) rune {
 		if r >= '0' && r <= '9' {
