@@ -2,7 +2,7 @@ run:
   timeout: 5m
   issues-exit-code: 1
   tests: true
-  go: "1.24"
+  go: "1.23"
   modules-download-mode: readonly
   allow-parallel-runners: true
 
@@ -55,7 +55,7 @@ linters-settings:
       - condition
       - operation
       - return
-    ignored-numbers: [0,1,2,3,4,5,6,7,8,9,10,11,14,48,100]
+    ignored-numbers: ["0","1","2","3","4","5","6","7","8","9","10","11","14","48","100"]
   
   govet:
     enable-all: true
